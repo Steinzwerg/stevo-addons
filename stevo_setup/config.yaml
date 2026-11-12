@@ -1,0 +1,25 @@
+name: STEVO Einrichtung
+version: "1.0.0"
+slug: stevo_setup
+description: Richtet einen neuen STEVO-Pi automatisch ein – Code im Team-Panel eingeben, fertig.
+url: https://stevo-smarthome.de
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: manual
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:home-plus
+panel_title: STEVO Einrichtung
+homeassistant_api: true
+hassio_api: true
+hassio_role: manager
+map:
+  - homeassistant_config:rw
+  - all_addon_configs:rw
+options:
+  site: https://stevo-smarthome.de
+schema:
+  site: url

@@ -1,0 +1,11 @@
+{
+  "name": "stevo-setup",
+  "version": "1.0.0",
+  "private": true,
+  "description": "STEVO Einrichtung – Add-on für neue Pis",
+  "main": "server.js",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "ws": "^8.18.0"
+  }
+}
