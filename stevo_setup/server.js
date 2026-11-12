@@ -40,6 +40,7 @@ const STEPS = [
   ["stevo", "STEVO einspielen"],
   ["restart", "Home Assistant neu starten"],
   ["pair", "Mit dem Kundenkonto koppeln"],
+  ["konto", "Konto an den Kunden übergeben"],
   ["check", "Fernzugriff prüfen"],
 ];
 
@@ -265,6 +266,20 @@ async function run(plan) {
       log("Mit dem Konto von " + plan.customer.name + " gekoppelt.");
     }
     step("pair", "ok", plan.customer.name);
+
+    /* Das beim Einrichten angelegte Besitzerkonto gehört ab jetzt dem Kunden: neuer Name, Benutzername und Passwort.
+       Das macht die STEVO-Integration; das Passwort geht von dort direkt an die Website, das Add-on und das Team sehen es nie. */
+    cur = "konto"; step("konto", "run");
+    let k = null;
+    for (let i = 0; i < 12; i++) {
+      k = await core("/services/stevo/konto_uebergeben?return_response", { method: "POST", json: { name: plan.customer.name, login: plan.customer.login || "" }, timeout: 60000 });
+      if (k.status === 200) break;
+      await sleep(5000);
+    }
+    if (!k || k.status !== 200) throw new Error("Konto-Übergabe fehlgeschlagen (HTTP " + (k && k.status) + "): " + String(k && (k.data && k.data.message || k.data)).slice(0, 200));
+    const user = k.data && k.data.service_response && k.data.service_response.user;
+    log("Konto gehört jetzt " + plan.customer.name + (user ? " (Benutzername " + user + ")" : "") + ". Das Passwort sieht nur der Kunde in seinem Konto auf der Website. Alle bisherigen Anmeldungen sind beendet.");
+    step("konto", "ok", user ? "Benutzername " + user : "");
 
     cur = "check";
     if (plan.remote && plan.remote.url) {
