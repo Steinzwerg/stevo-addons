@@ -1,3 +1,6 @@
+## 1.1.2
+- Meldet den Port von Home Assistant an die Website (ab HA 2026.8 bei Neuinstallationen 80 statt 8123), damit der Fernzugriff auf den richtigen Port zeigt.
+
 ## 1.1.1
 - Baut wieder auf neueren Home Assistant (Supervisor setzt BUILD_FROM nicht mehr): eigenes Basis-Image alpine:3.21.
 

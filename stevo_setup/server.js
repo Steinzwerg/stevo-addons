@@ -77,7 +77,7 @@ function report(state) {
     if (repBusy) return report();
     repBusy = true;
     const lines = pendingLog.splice(0, 30);
-    try { await site("einrichtung/status", { device: S.device, steps: S.steps, log: lines, state: S.reportState || "" }); }
+    try { await site("einrichtung/status", { device: S.device, steps: S.steps, log: lines, state: S.reportState || "", port: S.port || 0 }); }
     catch (e) { pendingLog = lines.concat(pendingLog); }
     repBusy = false;
     if (pendingLog.length) report();
@@ -218,6 +218,10 @@ async function run(plan) {
     cur = "remote";
     if (plan.remote && plan.remote.token) {
       step("remote", "run");
+      /* Port von Home Assistant: ab 2026.8 bei Neuinstallationen 80, sonst 8123. Die Website stellt den Tunnel darauf ein. */
+      try { const ci = await sup("/core/info"); S.port = +ci.port || 8123; } catch (e) { S.port = 8123; }
+      log("Home Assistant läuft auf Port " + S.port + ".");
+      save(); report();
       const cf = "9074a9fa_cloudflared";
       await installAddon(cf);
       const info = (await addonInfo(cf)) || {};
