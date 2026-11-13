@@ -200,17 +200,18 @@ async function trustProxy(coreVersion) {
   let last = "";
   for (const t of [{ config: want }, { config: { use_x_forwarded_for: true, trusted_proxies: tp, server_port: base.server_port || 80 } }]) {
     try {
-      await wsCall(Object.assign({}, t, { type: "http/config/configure" }));
-      /* Manche Änderungen gelten erst als „pending“ und werden nach 5 Minuten zurückgerollt, wenn niemand bestätigt */
-      await sleep(4000);
+      /* configure legt die Einstellung als „pending“ ab und startet Home Assistant neu. Danach muss sie mit
+         http/config/promote bestätigt werden, sonst setzt Home Assistant sie nach 5 Minuten zurück (und fragt im Browser nach). */
+      const res = (await wsCall(Object.assign({}, t, { type: "http/config/configure" }))) || {};
+      if (res.restart) { log("Home Assistant startet für die neue HTTP-Einstellung neu …"); await sleep(15000); await coreReady(); }
+      let ok = false, err = "";
+      for (let k = 0; k < 12 && !ok; k++) {
+        try { await wsCall({ type: "http/config/promote" }); ok = true; } catch (e) { err = e.message; await sleep(5000); }
+      }
       let now = {};
       try { now = (await wsCall({ type: "http/config" })) || {}; } catch (e) { /* egal */ }
-      if (now.active_config_type && now.active_config_type !== "stable") {
-        for (const c of ["http/config/confirm", "http/config/commit", "http/config/accept"]) {
-          try { await wsCall({ type: c }); log("HTTP-Einstellung bestätigt (" + c + ")."); break; } catch (e) { /* nächster Versuch */ }
-        }
-      }
-      return "in den Einstellungen gesetzt (X-Forwarded-For an, Proxy " + NET + ")";
+      if (!ok && now.pending) throw new Error("Bestätigen klappte nicht: " + err);
+      return "in den Einstellungen gesetzt und bestätigt (X-Forwarded-For an, Proxy " + NET + ")";
     } catch (e) { last = e.message; }
   }
   throw new Error("Reverse-Proxy ließ sich nicht automatisch einstellen (" + last.slice(0, 300) + "). Bitte in Home Assistant: Einstellungen → System → Netzwerk → HTTP-Server → „X-Forwarded-For vertrauen“ an und " + NET + " eintragen.");

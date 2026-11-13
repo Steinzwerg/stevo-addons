@@ -1,3 +1,6 @@
+## 1.2.2
+- Reverse-Proxy-Einstellung wird nach dem Neustart mit http/config/promote bestätigt. Kein Bestätigen im Browser mehr nötig, kein Zurücksetzen nach 5 Minuten.
+
 ## 1.2.1
 - Reverse-Proxy: http/config/configure bekommt jetzt das richtige Format ({ config: { … } } mit den aktiven Einstellungen), dazu Bestätigung, falls Home Assistant die Änderung erst vorläufig übernimmt.
 
