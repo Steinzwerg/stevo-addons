@@ -181,6 +181,29 @@ function trustTunnel() {
   return "eingetragen";
 }
 
+/* Reverse-Proxy erlauben (Cloudflare-Tunnel kommt aus 172.30.33.0/24).
+   Ab Home Assistant 2026.8 steht das nicht mehr in configuration.yaml, sondern in den Einstellungen
+   (Einstellungen → System → Netzwerk → HTTP-Server). Gesetzt wird es dann über den Admin-Befehl http/config/configure. */
+function verAtLeast(v, y, m) { const p = String(v || "").split("."); return +p[0] > y || (+p[0] === y && +p[1] >= m); }
+async function trustProxy(coreVersion) {
+  const NET = "172.30.33.0/24";
+  if (!verAtLeast(coreVersion, 2026, 8)) return "configuration.yaml: " + trustTunnel();
+  let cur = {};
+  try { const g = await wsCall({ type: "http/config" }); cur = (g && (g.config || g)) || {}; } catch (e) { /* ältere Variante ohne Abfrage */ }
+  const tp = Array.from(new Set([].concat(cur.trusted_proxies || [], [NET])));
+  const tries = [
+    { use_x_forwarded_for: true, trusted_proxies: tp },
+    Object.assign({}, cur, { use_x_forwarded_for: true, trusted_proxies: tp }),
+    { config: Object.assign({}, cur, { use_x_forwarded_for: true, trusted_proxies: tp }) },
+  ];
+  let last = "";
+  for (const t of tries) {
+    try { await wsCall(Object.assign({}, t, { type: "http/config/configure" })); return "in den Einstellungen gesetzt (X-Forwarded-For an, Proxy " + NET + ")"; }
+    catch (e) { last = e.message; }
+  }
+  throw new Error("Reverse-Proxy ließ sich nicht automatisch einstellen (" + last + "). Bitte in Home Assistant: Einstellungen → System → Netzwerk → HTTP-Server → „X-Forwarded-For vertrauen“ an und " + NET + " eintragen.");
+}
+
 /* ---------- Einrichtung ---------- */
 let running = false;
 async function run(plan) {
@@ -219,14 +242,16 @@ async function run(plan) {
     if (plan.remote && plan.remote.token) {
       step("remote", "run");
       /* Port von Home Assistant: ab 2026.8 bei Neuinstallationen 80, sonst 8123. Die Website stellt den Tunnel darauf ein. */
-      try { const ci = await sup("/core/info"); S.port = +ci.port || 8123; } catch (e) { S.port = 8123; }
+      let coreVer = "";
+      try { const ci = await sup("/core/info"); S.port = +ci.port || 8123; coreVer = ci.version || ""; } catch (e) { S.port = 8123; }
       log("Home Assistant läuft auf Port " + S.port + ".");
       save(); report();
       const cf = "9074a9fa_cloudflared";
       await installAddon(cf);
       const info = (await addonInfo(cf)) || {};
       await sup("/addons/" + cf + "/options", "POST", { options: Object.assign({}, info.options || {}, { tunnel_token: plan.remote.token }), boot: "auto", watchdog: true });
-      log("configuration.yaml: Tunnel als Proxy " + trustTunnel() + ".");
+      try { log("Reverse-Proxy: " + await trustProxy(coreVer) + "."); }
+      catch (e) { log(e.message); step("remote", "run", "Proxy bitte von Hand erlauben – siehe Protokoll"); }
       await wsCall({ type: "config/core/update", external_url: plan.remote.url });
       log("Externe Adresse: " + plan.remote.url);
       await startAddon(cf);
@@ -290,7 +315,7 @@ async function run(plan) {
       step("check", "run", plan.remote.url);
       let ok = false;
       for (let i = 0; i < 18 && !ok; i++) {
-        try { const r = await fetch(plan.remote.url + "/manifest.json", { signal: AbortSignal.timeout(8000) }); ok = r.status === 200; if (!ok) log("Fernzugriff antwortet noch mit HTTP " + r.status + " …"); }
+        try { const r = await fetch(plan.remote.url + "/manifest.json", { signal: AbortSignal.timeout(8000) }); ok = r.status === 200; if (!ok) log("Fernzugriff antwortet noch mit HTTP " + r.status + (r.status === 400 ? " (Home Assistant lehnt den Tunnel ab: Reverse-Proxy nicht erlaubt)" : r.status === 502 ? " (Tunnel erreicht Home Assistant nicht)" : "") + " …"); }
         catch (e) { if (i % 3 === 0) log("Fernzugriff noch nicht erreichbar …"); }
         if (!ok) await sleep(10000);
       }
