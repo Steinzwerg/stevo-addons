@@ -1,5 +1,5 @@
 name: STEVO Einrichtung
-version: "1.1.0"
+version: "1.1.1"
 slug: stevo_setup
 description: Richtet einen neuen STEVO-Pi automatisch ein – Code im Team-Panel eingeben, fertig.
 url: https://stevo-smarthome.de

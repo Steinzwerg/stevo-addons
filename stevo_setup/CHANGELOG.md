@@ -1,3 +1,6 @@
+## 1.1.1
+- Baut wieder auf neueren Home Assistant (Supervisor setzt BUILD_FROM nicht mehr): eigenes Basis-Image alpine:3.21.
+
 ## 1.1.0
 - Das beim Einrichten angelegte Konto wird automatisch an den Kunden übergeben (Name, Benutzername, neues Passwort, alte Anmeldungen beendet). Braucht STEVO 1.15.0.
 
