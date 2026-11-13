@@ -1,3 +1,6 @@
+## 1.2.1
+- Reverse-Proxy: http/config/configure bekommt jetzt das richtige Format ({ config: { … } } mit den aktiven Einstellungen), dazu Bestätigung, falls Home Assistant die Änderung erst vorläufig übernimmt.
+
 ## 1.2.0
 - Ab Home Assistant 2026.8: Reverse-Proxy (Cloudflare-Tunnel) wird in den Einstellungen gesetzt (http/config/configure) statt in configuration.yaml, sonst antwortet der Fernzugriff mit 400.
 - Prüfschritt sagt genauer, warum der Fernzugriff noch nicht geht (400 / 502).

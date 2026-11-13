@@ -188,20 +188,32 @@ function verAtLeast(v, y, m) { const p = String(v || "").split("."); return +p[0
 async function trustProxy(coreVersion) {
   const NET = "172.30.33.0/24";
   if (!verAtLeast(coreVersion, 2026, 8)) return "configuration.yaml: " + trustTunnel();
-  let cur = {};
-  try { const g = await wsCall({ type: "http/config" }); cur = (g && (g.config || g)) || {}; } catch (e) { /* ältere Variante ohne Abfrage */ }
-  const tp = Array.from(new Set([].concat(cur.trusted_proxies || [], [NET])));
-  const tries = [
-    { use_x_forwarded_for: true, trusted_proxies: tp },
-    Object.assign({}, cur, { use_x_forwarded_for: true, trusted_proxies: tp }),
-    { config: Object.assign({}, cur, { use_x_forwarded_for: true, trusted_proxies: tp }) },
-  ];
+  /* http/config liefert { active_config_type: "stable", default: {...}, stable: {...}, ... }.
+     http/config/configure erwartet { config: { server_port, use_x_forwarded_for, trusted_proxies, ... } }. */
+  let all = {};
+  try { all = (await wsCall({ type: "http/config" })) || {}; } catch (e) { log("http/config: " + e.message); }
+  const active = all.active_config_type && all[all.active_config_type] && typeof all[all.active_config_type] === "object" ? all[all.active_config_type] : null;
+  const base = Object.assign({}, all.default && typeof all.default === "object" ? all.default : {}, active || {}, (!all.default && !active) ? all : {});
+  delete base.active_config_type;
+  const tp = Array.from(new Set([].concat(base.trusted_proxies || [], [NET])));
+  const want = Object.assign({}, base, { use_x_forwarded_for: true, trusted_proxies: tp });
   let last = "";
-  for (const t of tries) {
-    try { await wsCall(Object.assign({}, t, { type: "http/config/configure" })); return "in den Einstellungen gesetzt (X-Forwarded-For an, Proxy " + NET + ")"; }
-    catch (e) { last = e.message; }
+  for (const t of [{ config: want }, { config: { use_x_forwarded_for: true, trusted_proxies: tp, server_port: base.server_port || 80 } }]) {
+    try {
+      await wsCall(Object.assign({}, t, { type: "http/config/configure" }));
+      /* Manche Änderungen gelten erst als „pending“ und werden nach 5 Minuten zurückgerollt, wenn niemand bestätigt */
+      await sleep(4000);
+      let now = {};
+      try { now = (await wsCall({ type: "http/config" })) || {}; } catch (e) { /* egal */ }
+      if (now.active_config_type && now.active_config_type !== "stable") {
+        for (const c of ["http/config/confirm", "http/config/commit", "http/config/accept"]) {
+          try { await wsCall({ type: c }); log("HTTP-Einstellung bestätigt (" + c + ")."); break; } catch (e) { /* nächster Versuch */ }
+        }
+      }
+      return "in den Einstellungen gesetzt (X-Forwarded-For an, Proxy " + NET + ")";
+    } catch (e) { last = e.message; }
   }
-  throw new Error("Reverse-Proxy ließ sich nicht automatisch einstellen (" + last + "). Bitte in Home Assistant: Einstellungen → System → Netzwerk → HTTP-Server → „X-Forwarded-For vertrauen“ an und " + NET + " eintragen.");
+  throw new Error("Reverse-Proxy ließ sich nicht automatisch einstellen (" + last.slice(0, 300) + "). Bitte in Home Assistant: Einstellungen → System → Netzwerk → HTTP-Server → „X-Forwarded-For vertrauen“ an und " + NET + " eintragen.");
 }
 
 /* ---------- Einrichtung ---------- */
