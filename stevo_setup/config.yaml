@@ -1,5 +1,5 @@
 name: STEVO Einrichtung
-version: "1.3.0"
+version: "1.4.0"
 slug: stevo_setup
 description: Bringt STEVO auf einen neuen Pi aus der Werkstatt oder in dein bestehendes Home Assistant.
 url: https://stevo-smarthome.de

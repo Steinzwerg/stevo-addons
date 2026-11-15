@@ -238,6 +238,34 @@ async function oberflaecheMerken(w) {
   await wsCall({ type: "frontend/set_system_data", key: "stevo", value: neu });
 }
 
+/* Werkstatt-Reste entfernen (1.4.0):
+   - Geräte, die Home Assistant in unserem Werkstatt-Netz gefunden hat („Entdeckt“), verwerfen.
+     Beim Kunden gibt es sie nicht, er soll sie weder unter Geräte noch im Verlauf sehen.
+     USB/Bluetooth/Add-ons bleiben (gehören zum Pi).
+   - Technische Werte der Systemintegrationen (Supervisor, Raspberry Pi, Netzteil, Backup) im Verlauf ausblenden.
+     Sie laufen weiter, nur die Auswahl im Verlauf bleibt übersichtlich. Updates bleiben sichtbar. */
+async function aufraeumen() {
+  const out = { flows: 0, hidden: 0 };
+  const keep = ["usb", "bluetooth", "hassio", "user", "reauth", "reconfigure", "system", "onboarding", "import", "integration_discovery"];
+  let flows = [];
+  try { flows = (await wsCall({ type: "config_entries/flow/progress" })) || []; } catch (e) { flows = []; }
+  for (const f of flows) {
+    const src = (f.context && f.context.source) || "";
+    if (keep.includes(src)) continue;
+    try { await core("/config/config_entries/flow/" + f.flow_id, { method: "DELETE" }); out.flows++; } catch (e) { /* weiter */ }
+  }
+  let ents = [], reg = [];
+  try { ents = (await wsCall({ type: "config_entries/get" })) || []; } catch (e) { ents = []; }
+  try { reg = (await wsCall({ type: "config/entity_registry/list" })) || []; } catch (e) { reg = []; }
+  const sys = new Set(ents.filter((e) => ["hassio", "raspberry_pi", "rpi_power", "backup", "go2rtc"].includes(e.domain)).map((e) => e.entry_id));
+  for (const r of reg) {
+    if (!sys.has(r.config_entry_id) || r.hidden_by || r.disabled_by) continue;
+    if (/^update\./.test(r.entity_id)) continue;
+    try { await wsCall({ type: "config/entity_registry/update", entity_id: r.entity_id, hidden_by: "user" }); out.hidden++; } catch (e) { /* weiter */ }
+  }
+  return out;
+}
+
 /* ---------- Einrichtung ---------- */
 let running = false;
 async function run(plan) {
@@ -369,6 +397,12 @@ async function run(plan) {
     step("konto", "ok", user ? "Benutzername " + user : "");
     }
     if (selbst && wahl.backup === false) log("Backups bei STEVO: später. Einschalten geht jederzeit in Home Assistant unter „Service“.");
+
+    /* Werkstatt: Aufräumen, damit der Kunde nichts aus unserem Netz sieht (Verlauf, „Entdeckt“) */
+    if (!selbst) {
+      try { const n = await aufraeumen(); log("Aufgeräumt: " + n.flows + " entdeckte Geräte aus der Werkstatt verworfen, " + n.hidden + " technische Werte ausgeblendet."); }
+      catch (e) { log("Aufräumen übersprungen: " + e.message); }
+    }
 
     cur = "check";
     if (plan.remote && plan.remote.url) {

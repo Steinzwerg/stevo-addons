@@ -1,3 +1,6 @@
+## 1.4.0
+- Werkstatt: Am Ende wird aufgeräumt. Geräte, die Home Assistant im Werkstatt-Netz gefunden hat („Entdeckt“), werden verworfen, technische Werte von Supervisor, Raspberry Pi, Netzteil und Backup im Verlauf ausgeblendet (laufen weiter). Updates bleiben sichtbar. Bei der Selbst-Einrichtung im eigenen Home Assistant wird nichts angefasst.
+
 ## 1.3.0
 - Selbst-Einrichtung für Kunden mit eigenem Home Assistant: Das Add-on erkennt ein schon benutztes System (mehrere Benutzer, Automationen oder viele Geräte) und zeigt „Mit STEVO-Konto verbinden“. Der Kunde wählt auf der Website, was eingerichtet wird (Startseite, Seitenleiste, Backups, Fernzugriff, Matter).
 - Im Selbst-Modus: keine Region, keine Werkstatt-Vorlage, keine Konto-Übergabe. Benutzer und Passwort des Kunden bleiben unverändert.
