@@ -1,3 +1,10 @@
+## 1.3.0
+- Selbst-Einrichtung für Kunden mit eigenem Home Assistant: Das Add-on erkennt ein schon benutztes System (mehrere Benutzer, Automationen oder viele Geräte) und zeigt „Mit STEVO-Konto verbinden“. Der Kunde wählt auf der Website, was eingerichtet wird (Startseite, Seitenleiste, Backups, Fernzugriff, Matter).
+- Im Selbst-Modus: keine Region, keine Werkstatt-Vorlage, keine Konto-Übergabe. Benutzer und Passwort des Kunden bleiben unverändert.
+- Sicherheit für die Werkstatt: Wirkt ein Home Assistant schon benutzt, wird auch dort kein Konto übernommen.
+- Neu koppeln: Eine alte STEVO-Kopplung wird vorher entfernt (der Plan bringt immer einen neuen Kopplungscode).
+- Werkstatt-Ablauf mit Installer bleibt unverändert.
+
 ## 1.2.3
 - Matter Server wird mit „ble_proxy“ eingerichtet: Home Assistant koppelt Matter-Geräte über das eingebaute Bluetooth des Pi, ohne Funk-Stick und ohne Handy-App.
 

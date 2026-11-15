@@ -15,7 +15,7 @@ li b{display:block;font-weight:600}li small{color:var(--mu)}
 @keyframes p{50%{opacity:.3}}
 pre{margin:0;padding:12px;border-radius:10px;background:var(--bg);font:12px/1.55 ui-monospace,Menlo,monospace;white-space:pre-wrap;max-height:260px;overflow:auto;color:var(--mu)}
 details{margin-top:20px}summary{cursor:pointer;color:var(--mu);font-size:13px}
-button{font:inherit;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--li);background:var(--sf);color:var(--fg);cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:#fff}
+button{font:inherit;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--li);background:var(--sf);color:var(--fg);cursor:pointer}button.p,a.btn.p{background:var(--ac);border-color:var(--ac);color:#fff}a.btn{display:inline-flex;align-items:center;font-weight:600;text-decoration:none;height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--li)}a{color:var(--ac)}
 .err{color:var(--bad)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px}.dot.off{background:var(--bad)}
 </style></head><body><main id="m"><div class="kick">STEVO Einrichtung</div><h1>Einen Moment …</h1></main>
 <script>
@@ -25,7 +25,8 @@ function post(p){return fetch(p,{method:"POST"}).then(tick)}
 function draw(s){
   var h='<div class="kick">STEVO Einrichtung</div>';
   if(s.phase==="start"||(s.phase==="code"&&!s.code)) h+='<h1>Hole einen Code …</h1><p>Der Pi meldet sich bei __SITE__.</p>';
-  else if(s.phase==="code") h+='<h1>Code im Team-Panel eingeben.</h1><p>Team-Panel → <b>Neuer Pi</b> → Code eintragen und Kunden wählen. Den Rest macht der Pi selbst.</p><div class="card"><div class="kick"><span class="dot'+(s.online?"":" off")+'"></span>Dein Code</div><div class="code">'+e(s.code)+'</div><p>Gilt 6 Stunden. Diese Seite aktualisiert sich von selbst.</p></div>';
+  else if(s.phase==="code"&&s.alt) h+='<h1>Mit deinem STEVO-Konto verbinden.</h1><p>Klick auf den Knopf, melde dich an und wähl aus, was STEVO einrichten soll. Dein Konto, deine Geräte und Automationen bleiben, wie sie sind.</p><p><a class="btn p" href="'+e(s.link)+'" target="_blank" rel="noopener">Mit STEVO-Konto verbinden</a></p><div class="card"><div class="kick"><span class="dot'+(s.online?"":" off")+'"></span>Dein Code</div><div class="code">'+e(s.code)+'</div><p>Steht auch auf der Seite, die sich öffnet. Gilt 6 Stunden. Diese Seite aktualisiert sich von selbst.</p></div>';
+  else if(s.phase==="code") h+='<h1>Warte auf die Zuordnung.</h1><p>Der STEVO Installer ordnet diesen Pi automatisch zu. Ohne Installer: Team-Panel → <b>Neuer Pi</b> → Code eintragen.</p><div class="card"><div class="kick"><span class="dot'+(s.online?"":" off")+'"></span>Code</div><div class="code">'+e(s.code)+'</div><p>Gilt 6 Stunden. Diese Seite aktualisiert sich von selbst.</p></div><p style="margin-top:18px">Du richtest STEVO selbst in deinem Home Assistant ein? <a href="'+e(s.link)+'" target="_blank" rel="noopener">Mit STEVO-Konto verbinden</a></p>';
   else {
     h+='<h1>'+(s.phase==="fertig"?"Fertig.":s.phase==="fehler"?"Da hat etwas nicht geklappt.":"Richte den Pi ein …")+'</h1><p>'+(s.customer?"Für "+e(s.customer)+". ":"")+(s.phase==="fertig"?(s.remote?'Erreichbar unter <a href="'+e(s.remote)+'" target="_blank" rel="noopener">'+e(s.remote.replace("https://",""))+'</a>.':"Alles erledigt."):s.phase==="fehler"?'<span class="err">'+e(s.error)+'</span>':"Das dauert meist 10 bis 20 Minuten. Du kannst die Seite schließen.")+'</p>';
     h+='<div class="card"><ol>'+s.steps.map(function(x){return '<li class="'+e(x.st)+'"><span><b>'+e(x.n)+'</b>'+(x.x?'<small>'+e(x.x)+'</small>':'')+'</span></li>'}).join("")+'</ol></div>';

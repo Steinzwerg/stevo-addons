@@ -33,6 +33,7 @@ const ADDONS = {
   core_configurator: { name: "File editor", start: true },
   "9074a9fa_cloudflared": { name: "Cloudflared (Fernzugriff)", repo: "https://github.com/brenner-tobias/ha-addons", start: true },
 };
+const SELBST_N = { region: "Deine Auswahl übernehmen", addons: "Matter einrichten", pair: "Mit deinem STEVO-Konto koppeln", konto: "Dein Konto" };
 const STEPS = [
   ["region", "Region einstellen"],
   ["addons", "Add-ons installieren"],
@@ -217,19 +218,49 @@ async function trustProxy(coreVersion) {
   throw new Error("Reverse-Proxy ließ sich nicht automatisch einstellen (" + last.slice(0, 300) + "). Bitte in Home Assistant: Einstellungen → System → Netzwerk → HTTP-Server → „X-Forwarded-For vertrauen“ an und " + NET + " eintragen.");
 }
 
+/* ---------- Schon benutztes Home Assistant? ----------
+   Werkstatt-Pi: nur das gerade angelegte Einrichtungskonto, keine Automationen, kaum Geräte.
+   Beim eigenen Home Assistant des Kunden gibt es mehr davon. Dann wird nie ein Konto übernommen. */
+async function alterStand() {
+  const r = { users: 0, autos: 0, devices: 0 };
+  try { r.users = ((await wsCall({ type: "config/auth/list" })) || []).filter((u) => !u.system_generated).length; } catch (e) { /* egal */ }
+  try { const st = await core("/states"); if (Array.isArray(st.data)) r.autos = st.data.filter((x) => /^(automation|script)\./.test(x.entity_id)).length; } catch (e) { /* egal */ }
+  try { r.devices = ((await wsCall({ type: "config/device_registry/list" })) || []).filter((d) => d.entry_type !== "service").length; } catch (e) { /* egal */ }
+  r.alt = r.users >= 2 || r.autos >= 1 || r.devices >= 15;
+  return r;
+}
+
+/* Merker für die STEVO-Oberfläche: Startseite/Seitenleiste nicht anfassen (Wahl des Kunden) */
+async function oberflaecheMerken(w) {
+  let merk = {};
+  try { merk = ((await wsCall({ type: "frontend/get_system_data", key: "stevo" })) || {}).value || {}; } catch (e) { /* neu */ }
+  const neu = Object.assign({}, merk, { start: !!w.start, side: !!w.side });
+  await wsCall({ type: "frontend/set_system_data", key: "stevo", value: neu });
+}
+
 /* ---------- Einrichtung ---------- */
 let running = false;
 async function run(plan) {
   if (running) return; running = true;
   S.phase = "run"; S.error = ""; S.customer = plan.customer.name; S.remote = plan.remote ? plan.remote.url : "";
-  S.steps = STEPS.map(([k, n]) => ({ k, n, st: "wait", x: "" }));
+  const selbst = plan.mode === "selbst";
+  const wahl = plan.wahl || {};
+  S.steps = STEPS.map(([k, n]) => ({ k, n: selbst && SELBST_N[k] ? SELBST_N[k] : n, st: "wait", x: "" }));
   save(); report("laeuft");
-  log("Los geht’s: Pi für " + plan.customer.name + ".");
+  log(selbst ? "Los geht’s: STEVO für das Home Assistant von " + plan.customer.name + "." : "Los geht’s: Pi für " + plan.customer.name + ".");
   let cur = "region";
   try {
+    const stand = await alterStand();
+    if (stand.alt) log("Home Assistant ist schon in Benutzung (" + stand.users + " Benutzer, " + stand.autos + " Automationen/Skripte, " + stand.devices + " Geräte). Konto, Geräte und Automationen bleiben unverändert.");
     step("region", "run");
-    await wsCall({ type: "config/core/update", country: "DE", language: "de", time_zone: "Europe/Berlin", currency: "EUR", unit_system: "metric" });
-    step("region", "ok", "Deutschland, Europe/Berlin, Euro");
+    if (selbst) {
+      try { await oberflaecheMerken(wahl); log("Startseite: " + (wahl.start ? "STEVO Home kommt dazu." : "deine bleibt.") + " Seitenleiste: " + (wahl.side ? "STEVO-Seiten nach oben." : "bleibt, wie sie ist.")); }
+      catch (e) { log("Wahl für Startseite/Seitenleiste nicht gespeichert: " + e.message); }
+      step("region", "ok", (wahl.start ? "STEVO-Startseite" : "Startseite bleibt") + ", " + (wahl.side ? "Seitenleiste sortiert" : "Seitenleiste bleibt"));
+    } else {
+      await wsCall({ type: "config/core/update", country: "DE", language: "de", time_zone: "Europe/Berlin", currency: "EUR", unit_system: "metric" });
+      step("region", "ok", "Deutschland, Europe/Berlin, Euro");
+    }
 
     cur = "addons"; step("addons", "run");
     const vor = plan.vorlage;
@@ -254,7 +285,7 @@ async function run(plan) {
         try { await startAddon(slug); log((ADDONS[slug] || { name: slug }).name + " läuft."); } catch (e) { log((ADDONS[slug] || { name: slug }).name + " startet nicht: " + e.message); }
       }
     }
-    step("addons", "ok", (plan.addons || []).length ? (plan.addons.length + " installiert") + (vor ? ", mit Vorlage" : "") : "keine gewählt");
+    step("addons", (plan.addons || []).length ? "ok" : "skip", (plan.addons || []).length ? (plan.addons.length + " installiert") + (vor ? ", mit Vorlage" : "") : "keine gewählt");
 
     cur = "remote";
     if (plan.remote && plan.remote.token) {
@@ -293,8 +324,12 @@ async function run(plan) {
 
     cur = "pair"; step("pair", "run");
     const ents = await core("/config/config_entries/entry");
-    if (Array.isArray(ents.data) && ents.data.some((e) => e.domain === "stevo")) log("STEVO ist schon gekoppelt.");
-    else {
+    /* Der Plan bringt immer einen neuen Kopplungscode mit (der alte gilt auf der Website nicht mehr): alte Kopplung entfernen */
+    for (const old of (Array.isArray(ents.data) ? ents.data : []).filter((e) => e.domain === "stevo")) {
+      try { await core("/config/config_entries/entry/" + old.entry_id, { method: "DELETE" }); log("Alte STEVO-Kopplung entfernt, koppel neu."); await sleep(3000); }
+      catch (e) { log("Alte Kopplung ließ sich nicht entfernen: " + e.message); }
+    }
+    {
       let f = null;
       for (let i = 0; i < 12; i++) { f = await core("/config/config_entries/flow", { method: "POST", json: { handler: "stevo", show_advanced_options: false } }); if (f.status === 200) break; await sleep(5000); }
       if (!f || f.status !== 200) throw new Error("Home Assistant findet die STEVO-Integration nicht (HTTP " + (f && f.status) + ").");
@@ -316,7 +351,12 @@ async function run(plan) {
 
     /* Das beim Einrichten angelegte Besitzerkonto gehört ab jetzt dem Kunden: neuer Name, Benutzername und Passwort.
        Das macht die STEVO-Integration; das Passwort geht von dort direkt an die Website, das Add-on und das Team sehen es nie. */
-    cur = "konto"; step("konto", "run");
+    cur = "konto";
+    if (selbst || stand.alt) {
+      step("konto", "skip", "Dein Benutzer und Passwort bleiben, wie sie sind");
+      if (!selbst) log("Konto-Übergabe übersprungen: Dieses Home Assistant ist schon in Benutzung.");
+    } else {
+    step("konto", "run");
     let k = null;
     for (let i = 0; i < 12; i++) {
       k = await core("/services/stevo/konto_uebergeben?return_response", { method: "POST", json: { name: plan.customer.name, login: plan.customer.login || "" }, timeout: 60000 });
@@ -327,6 +367,8 @@ async function run(plan) {
     const user = k.data && k.data.service_response && k.data.service_response.user;
     log("Konto gehört jetzt " + plan.customer.name + (user ? " (Benutzername " + user + ")" : "") + ". Das Passwort sieht nur der Kunde in seinem Konto auf der Website. Alle bisherigen Anmeldungen sind beendet.");
     step("konto", "ok", user ? "Benutzername " + user : "");
+    }
+    if (selbst && wahl.backup === false) log("Backups bei STEVO: später. Einschalten geht jederzeit in Home Assistant unter „Service“.");
 
     cur = "check";
     if (plan.remote && plan.remote.url) {
@@ -357,11 +399,13 @@ async function newCode() {
   let name = os.hostname(), ver = "";
   try { const h = await sup("/host/info"); name = h.hostname || name; } catch (e) { /* egal */ }
   try { const c = await sup("/core/info"); ver = c.version || ""; } catch (e) { /* egal */ }
-  const j = await site("einrichtung/start", { name, ha: ver });
+  let alt = false;
+  try { const st = await alterStand(); alt = st.alt; S.alt = alt; } catch (e) { /* egal */ }
+  const j = await site("einrichtung/start", { name, ha: ver, alt: alt ? 1 : 0 });
   if (!j.ok) throw new Error(j.message || j.error || "Kein Code von der Website.");
   Object.assign(S, { code: j.code, device: j.device, phase: "code", steps: [], error: "", customer: "", remote: "" });
   S.log = []; save();
-  log("Code " + j.code + " – bitte im Team-Panel unter „Neuer Pi“ eingeben.");
+  log("Code " + j.code + (alt ? " – auf „Mit STEVO-Konto verbinden“ klicken." : " – wird vom STEVO Installer zugeordnet (oder im Team-Panel unter „Neuer Pi“)."));
 }
 async function loop() {
   for (;;) {
@@ -386,7 +430,7 @@ http.createServer((req, res) => {
   const u = (req.url || "/").split("?")[0];
   if (u.endsWith("/state")) {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    return res.end(JSON.stringify({ phase: S.phase, code: S.code, steps: S.steps, log: S.log.slice(-60), error: S.error, customer: S.customer, remote: S.remote, online: S.online !== false }));
+    return res.end(JSON.stringify({ phase: S.phase, code: S.code, alt: !!S.alt, link: S.code ? SITE + "/?stevo_koppeln=" + encodeURIComponent(S.code) : "", steps: S.steps, log: S.log.slice(-60), error: S.error, customer: S.customer, remote: S.remote, online: S.online !== false }));
   }
   if (u.endsWith("/retry") && req.method === "POST") {
     /* Nochmal: gleicher Plan, wenn er noch da ist; sonst neuer Code */
