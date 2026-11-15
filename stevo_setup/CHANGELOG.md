@@ -1,3 +1,6 @@
+## 1.2.3
+- Matter Server wird mit „ble_proxy“ eingerichtet: Home Assistant koppelt Matter-Geräte über das eingebaute Bluetooth des Pi, ohne Funk-Stick und ohne Handy-App.
+
 ## 1.2.2
 - Reverse-Proxy-Einstellung wird nach dem Neustart mit http/config/promote bestätigt. Kein Bestätigen im Browser mehr nötig, kein Zurücksetzen nach 5 Minuten.
 

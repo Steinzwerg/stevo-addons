@@ -245,6 +245,11 @@ async function run(plan) {
           log("Frigate: Grundeinstellungen aus der Vorlage gespeichert (Kameras kommen pro Kunde dazu).");
         } catch (e) { log("Frigate-Vorlage: " + e.message); }
       }
+      if (slug === "core_matter_server") {
+        /* Matter ohne Funk-Stick: Home Assistant koppelt WLAN-Geräte über das Bluetooth des Pi (ble_proxy, ab Home Assistant 2026.6) */
+        try { const mi = (await addonInfo(slug)) || {}; const mo = Object.assign({}, mi.options || {}, { ble_proxy: true }); delete mo.bluetooth_adapter_id; await sup("/addons/" + slug + "/options", "POST", { options: mo }); log("Matter: Kopplung über das Bluetooth des Pi eingeschaltet."); }
+        catch (e) { log("Matter: Bluetooth-Kopplung nicht eingeschaltet (" + e.message + ")."); }
+      }
       if ((ADDONS[slug] || {}).start) {
         try { await startAddon(slug); log((ADDONS[slug] || { name: slug }).name + " läuft."); } catch (e) { log((ADDONS[slug] || { name: slug }).name + " startet nicht: " + e.message); }
       }
