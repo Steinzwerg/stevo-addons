@@ -1,3 +1,6 @@
+## 1.4.1
+- Selbst-Einrichtung: Wahl „Seitenleiste aufräumen“ wird an Home Assistant weitergegeben (STEVO 1.29.6 blendet dann alte Dashboards, Verlauf und Aktivität aus). Bei der Einrichtung durchs Team ist Aufräumen Standard.
+
 ## 1.4.0
 - Werkstatt: Am Ende wird aufgeräumt. Geräte, die Home Assistant im Werkstatt-Netz gefunden hat („Entdeckt“), werden verworfen, technische Werte von Supervisor, Raspberry Pi, Netzteil und Backup im Verlauf ausgeblendet (laufen weiter). Updates bleiben sichtbar. Bei der Selbst-Einrichtung im eigenen Home Assistant wird nichts angefasst.
 

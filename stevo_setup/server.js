@@ -234,7 +234,7 @@ async function alterStand() {
 async function oberflaecheMerken(w) {
   let merk = {};
   try { merk = ((await wsCall({ type: "frontend/get_system_data", key: "stevo" })) || {}).value || {}; } catch (e) { /* neu */ }
-  const neu = Object.assign({}, merk, { start: !!w.start, side: !!w.side });
+  const neu = Object.assign({}, merk, { start: !!w.start, side: !!w.side, aufr: w.aufr !== false });  // aufr (1.4.1): Seitenleiste aufräumen, Standard ja
   await wsCall({ type: "frontend/set_system_data", key: "stevo", value: neu });
 }
 
@@ -284,7 +284,7 @@ async function run(plan) {
     if (selbst) {
       try { await oberflaecheMerken(wahl); log("Startseite: " + (wahl.start ? "STEVO Home kommt dazu." : "deine bleibt.") + " Seitenleiste: " + (wahl.side ? "STEVO-Seiten nach oben." : "bleibt, wie sie ist.")); }
       catch (e) { log("Wahl für Startseite/Seitenleiste nicht gespeichert: " + e.message); }
-      step("region", "ok", (wahl.start ? "STEVO-Startseite" : "Startseite bleibt") + ", " + (wahl.side ? "Seitenleiste sortiert" : "Seitenleiste bleibt"));
+      step("region", "ok", (wahl.start ? "STEVO-Startseite" : "Startseite bleibt") + ", " + (wahl.side ? (wahl.aufr !== false ? "Seitenleiste aufgeräumt" : "Seitenleiste sortiert") : "Seitenleiste bleibt"));
     } else {
       await wsCall({ type: "config/core/update", country: "DE", language: "de", time_zone: "Europe/Berlin", currency: "EUR", unit_system: "metric" });
       step("region", "ok", "Deutschland, Europe/Berlin, Euro");
