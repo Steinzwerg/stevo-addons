@@ -135,6 +135,43 @@ async function installAddon(slug) {
   catch (e) { await sup("/addons/" + slug + "/install", "POST", undefined, 30 * 60000); }
   if (!(await addonInfo(slug))) throw new Error(a.name + " ließ sich nicht installieren.");
 }
+/* Zigbee-Stick finden: Pfad unter /dev/serial/by-id und passender Adapter-Typ für Zigbee2MQTT */
+async function zigbeeStick() {
+  const hw = await sup("/hardware/info");
+  const devs = (hw && hw.devices) || [];
+  const kand = [];
+  for (const d of devs) {
+    for (const p of [].concat(d.by_id || [], d.dev_path || [])) {
+      if (typeof p === "string" && p.indexOf("/dev/serial/by-id/") === 0) kand.push(p);
+    }
+  }
+  const art = (p) => {
+    const n = p.toLowerCase();
+    if (/zbt-2|zbt2/.test(n)) return { adapter: "ember", baudrate: 460800, name: "Home Assistant Connect ZBT-2" };
+    if (/skyconnect|zbt-1|zbt1/.test(n)) return { adapter: "ember", name: "Home Assistant Connect ZBT-1" };
+    if (/dongle_plus_v2|dongle-e|dongle_e|mg21|mg24|efr32|silicon_labs|ezsp/.test(n)) return { adapter: "ember", name: "Sonoff/Silabs-Stick" };
+    if (/dongle_plus|dongle-p|cc2652|cc1352|texas_instruments|slzb-06p|zstack/.test(n)) return { adapter: "zstack", name: "Sonoff Dongle-P / TI-Stick" };
+    if (/conbee|dresden|raspbee/.test(n)) return { adapter: "deconz", name: "ConBee" };
+    if (/zigbee|slzb/.test(n)) return { adapter: "ember", name: "Zigbee-Stick" };
+    return null;
+  };
+  for (const p of kand) { const a = art(p); if (a) return Object.assign({ port: p }, a); }
+  return null;
+}
+async function zigbeeEinrichten(warten) {
+  const slug = "45df7312_zigbee2mqtt";
+  let st = await zigbeeStick();
+  for (let i = 0; !st && warten && i < warten; i++) { await new Promise((r) => setTimeout(r, 5000)); st = await zigbeeStick(); }
+  if (!st) return "Zigbee2MQTT: kein Zigbee-Stick gefunden. Stick einstecken, dann in STEVO → Einrichten auf „Zigbee-Stick einrichten“ (oder Zigbee2MQTT → Konfiguration → serial).";
+  const info = (await addonInfo(slug)) || {};
+  const opt = Object.assign({}, info.options || {});
+  const ser = Object.assign({}, opt.serial || {}, { port: st.port, adapter: st.adapter });
+  if (st.baudrate) ser.baudrate = st.baudrate; else delete ser.baudrate;
+  opt.serial = ser;
+  await sup("/addons/" + slug + "/options", "POST", { options: opt, boot: "auto", watchdog: true });
+  try { await startAddon(slug); } catch (e) { return "Zigbee2MQTT: " + st.name + " eingetragen, startet aber nicht: " + e.message; }
+  return "Zigbee2MQTT: " + st.name + " erkannt (" + st.adapter + "), eingetragen und gestartet.";
+}
 async function startAddon(slug) {
   try { await sup("/addons/" + slug + "/options", "POST", { boot: "auto", watchdog: true }); } catch (e) { /* nicht jedes Add-on kennt watchdog */ }
   await sup("/addons/" + slug + "/start", "POST", undefined, 5 * 60000);
@@ -308,6 +345,10 @@ async function run(plan) {
         /* Matter ohne Funk-Stick: Home Assistant koppelt WLAN-Geräte über das Bluetooth des Pi (ble_proxy, ab Home Assistant 2026.6) */
         try { const mi = (await addonInfo(slug)) || {}; const mo = Object.assign({}, mi.options || {}, { ble_proxy: true }); delete mo.bluetooth_adapter_id; await sup("/addons/" + slug + "/options", "POST", { options: mo }); log("Matter: Kopplung über das Bluetooth des Pi eingeschaltet."); }
         catch (e) { log("Matter: Bluetooth-Kopplung nicht eingeschaltet (" + e.message + ")."); }
+      }
+      if (slug === "45df7312_zigbee2mqtt") {
+        /* 1.4.2: Zigbee-Stick automatisch erkennen, eintragen und Zigbee2MQTT starten */
+        try { const r = await zigbeeEinrichten(); log(r); } catch (e) { log("Zigbee2MQTT: Stick nicht automatisch eingerichtet (" + e.message + ")."); }
       }
       if ((ADDONS[slug] || {}).start) {
         try { await startAddon(slug); log((ADDONS[slug] || { name: slug }).name + " läuft."); } catch (e) { log((ADDONS[slug] || { name: slug }).name + " startet nicht: " + e.message); }

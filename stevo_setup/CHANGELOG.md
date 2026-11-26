@@ -1,3 +1,6 @@
+## 1.4.2
+- Zigbee-Stick wird automatisch erkannt (ZBT-2, ZBT-1, Sonoff Dongle-E/-P, ConBee, SLZB), in Zigbee2MQTT eingetragen und Zigbee2MQTT gestartet. Der Stick muss beim Einrichten stecken.
+
 ## 1.4.1
 - Selbst-Einrichtung: Wahl „Seitenleiste aufräumen“ wird an Home Assistant weitergegeben (STEVO 1.29.6 blendet dann alte Dashboards, Verlauf und Aktivität aus). Bei der Einrichtung durchs Team ist Aufräumen Standard.
 
