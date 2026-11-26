@@ -1,3 +1,6 @@
+## 1.4.3
+- MQTT wird beim Einrichten automatisch mit Home Assistant verbunden. Zigbee-Geräte erscheinen damit sofort in Home Assistant.
+
 ## 1.4.2
 - Zigbee-Stick wird automatisch erkannt (ZBT-2, ZBT-1, Sonoff Dongle-E/-P, ConBee, SLZB), in Zigbee2MQTT eingetragen und Zigbee2MQTT gestartet. Der Stick muss beim Einrichten stecken.
 

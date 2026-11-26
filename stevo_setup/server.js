@@ -135,6 +135,22 @@ async function installAddon(slug) {
   catch (e) { await sup("/addons/" + slug + "/install", "POST", undefined, 30 * 60000); }
   if (!(await addonInfo(slug))) throw new Error(a.name + " ließ sich nicht installieren.");
 }
+/* MQTT-Integration in Home Assistant anlegen: Mosquitto meldet sich per Supervisor-Erkennung, wir bestätigen den Fund */
+async function mqttVerbinden() {
+  try { const e = await wsCall({ type: "config_entries/get", domain: "mqtt" }); if (Array.isArray(e) && e.some((x) => x.domain === "mqtt")) return "MQTT ist schon mit Home Assistant verbunden."; } catch (e) {}
+  for (let i = 0; i < 18; i++) {
+    const r = await core("/config/config_entries/flow");
+    const f = Array.isArray(r.data) ? r.data.find((x) => x.handler === "mqtt") : null;
+    if (f) {
+      const a = await core("/config/config_entries/flow/" + f.flow_id, { method: "POST", json: {} });
+      if (a.data && a.data.type === "create_entry") return "MQTT mit Home Assistant verbunden.";
+      if (a.data && a.data.type === "abort") return "MQTT: " + (a.data.reason || "abgebrochen");
+      return "MQTT: unerwartete Antwort (" + ((a.data && a.data.type) || a.status) + ").";
+    }
+    await new Promise((res) => setTimeout(res, 5000));
+  }
+  return "MQTT: Home Assistant hat Mosquitto noch nicht gemeldet. Bitte unter Einstellungen → Geräte & Dienste bei „MQTT“ auf Hinzufügen tippen.";
+}
 /* Zigbee-Stick finden: Pfad unter /dev/serial/by-id und passender Adapter-Typ für Zigbee2MQTT */
 async function zigbeeStick() {
   const hw = await sup("/hardware/info");
@@ -347,6 +363,8 @@ async function run(plan) {
         catch (e) { log("Matter: Bluetooth-Kopplung nicht eingeschaltet (" + e.message + ")."); }
       }
       if (slug === "45df7312_zigbee2mqtt") {
+        /* 1.4.3: MQTT-Verbindung in Home Assistant automatisch bestätigen (sonst landen Zigbee-Geräte nicht in Home Assistant) */
+        try { log(await mqttVerbinden()); } catch (e) { log("MQTT: nicht automatisch verbunden (" + e.message + ")."); }
         /* 1.4.2: Zigbee-Stick automatisch erkennen, eintragen und Zigbee2MQTT starten */
         try { const r = await zigbeeEinrichten(); log(r); } catch (e) { log("Zigbee2MQTT: Stick nicht automatisch eingerichtet (" + e.message + ")."); }
       }
