@@ -309,6 +309,17 @@ async function aufraeumen() {
   }
   let ents = [], reg = [];
   try { ents = (await wsCall({ type: "config_entries/get" })) || []; } catch (e) { ents = []; }
+  /* 1.4.4: Während der Ersteinrichtung (Onboarding) richtet Home Assistant gefundene Netzwerkgeräte ohne Rückfrage ein
+     (z. B. Sonos, Chromecast, Drucker aus unserem Netz). Die gehören nicht zum Kunden: Integrationen, die über das Netzwerk
+     gefunden wurden, wieder entfernen. Beim Kunden werden seine eigenen Geräte neu gefunden und angeboten. */
+  const netz = ["zeroconf", "ssdp", "dhcp", "homekit"];
+  const bleibt = ["hassio", "raspberry_pi", "rpi_power", "backup", "go2rtc", "matter", "otbr", "thread", "mqtt", "zha", "homeassistant_sky_connect", "homeassistant_connect_zbt2", "homeassistant_yellow", "met", "sun", "radio_browser", "google_translate", "shopping_list", "stevo"];
+  out.entries = []; 
+  for (const e of ents) {
+    if (!netz.includes(e.source) || bleibt.includes(e.domain)) continue;
+    try { await core("/config/config_entries/entry/" + e.entry_id, { method: "DELETE" }); out.entries.push(e.title || e.domain); } catch (er) { /* weiter */ }
+  }
+  ents = ents.filter((e) => !(netz.includes(e.source) && !bleibt.includes(e.domain)));
   try { reg = (await wsCall({ type: "config/entity_registry/list" })) || []; } catch (e) { reg = []; }
   const sys = new Set(ents.filter((e) => ["hassio", "raspberry_pi", "rpi_power", "backup", "go2rtc"].includes(e.domain)).map((e) => e.entry_id));
   for (const r of reg) {
@@ -459,7 +470,7 @@ async function run(plan) {
 
     /* Werkstatt: Aufräumen, damit der Kunde nichts aus unserem Netz sieht (Verlauf, „Entdeckt“) */
     if (!selbst) {
-      try { const n = await aufraeumen(); log("Aufgeräumt: " + n.flows + " entdeckte Geräte aus der Werkstatt verworfen, " + n.hidden + " technische Werte ausgeblendet."); }
+      try { const n = await aufraeumen(); log("Aufgeräumt: " + n.flows + " entdeckte Geräte aus der Werkstatt verworfen" + (n.entries.length ? ", entfernt: " + n.entries.join(", ") : "") + ", " + n.hidden + " technische Werte ausgeblendet."); }
       catch (e) { log("Aufräumen übersprungen: " + e.message); }
     }
 

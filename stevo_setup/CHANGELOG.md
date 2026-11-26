@@ -1,3 +1,6 @@
+## 1.4.4
+- Werkstatt: Geräte aus unserem Netz, die Home Assistant bei der Ersteinrichtung ungefragt eingerichtet hat (z. B. Sonos, Chromecast, Drucker), werden am Ende wieder entfernt. Beim Kunden werden seine eigenen Geräte neu gefunden.
+
 ## 1.4.3
 - MQTT wird beim Einrichten automatisch mit Home Assistant verbunden. Zigbee-Geräte erscheinen damit sofort in Home Assistant.
 
